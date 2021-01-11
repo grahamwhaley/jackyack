@@ -62,7 +62,39 @@ Released V. 0.75 (really, just personalized preferences for DK3LJ's YACK project
   + Default mode Iambic A
   + Default side tone 700 Hz
   + Default keying positive
-  + Default speed 15 wpm
+  + Default speed 15 wpm!
   + Plays greeting "73" (without keying) when powered on
   + Replaced "OK" with "R" for command acknowledgments
   + Replaced "E" with "SK" when exiting command mode
+  
+ Released V. 0.85 - 22.12.2016 - Don Froula, WD9DMP
+  + Default mode Iambic B
+  + Default side tone 800 Hz
+  + Fixed changes in speed not saving to EEPROM after command key release
+  + Fixed changes in sidetone not saving to EEPROM on timeout (worked only when command key pressed to exit)
+  + Added 2 additional 100 character memories, 3 and 4. Now works on ATTINY85 only
+  + Changed directives for compilation on ATTINY85
+  + Changed commands for memory playback: "E" for memory 1, "I" for memory 2, "T" for memory 3, "M" for memory 4
+  + Added commands "3" and "4" for recording new memories
+  + Changed command to change keying polarity from "I" to "F" ("Flip") to accomodate use of "I" for memory playback
+  + Unit enters low power mode after 60 seconds, not 30 as specified in yack.h. Not sure why, as other timings are ok so left it
+  + Measured current draw at 4.5 volts is about 1 ma in active idle. In power down mode, draw is only .3 microamps.
+  + Added additional punctuation recognition for memory recording. Now: ? . / !(American and Continental) , : ; " $ ' ( ) - @ _ paragraphbreak = +
+  + Added additional prosign recognition for memory recording, Now: BT SK AR KN BK AS KA VE AA
+  + Beacon mode now uses memory 4
+  
+  Released V. 0.86 - 22.12.2016 - Don Froula, WD9DMP
+  + Added a call to save changes to EEPROM while in command mode loop if DIRTYFLAG set for better EEPROM parm save reliability.
+  + Changed "SK" response when leaving command mode to "#" which now decodes to proper SK without intercharacter space.
+  + Beacon command ("N") was in both the lockable and unlockable command list, making it unlockable. I removed it from the unlockable list, making it lockable.  
+  
+  Released V. 0.87 - 03.01.2017 - Don Froula, WD9DMP
+  + Added short 3 DAH delay after command returns before txok ("R") is sent to prevent some command outputs running on with txok.
+  + If memory recording is interrupted by command button, keyer now returns txok ("R") and stays in command mode. Memory is unchanged.
+  + Memory playback halts immediately on command key instead of looping through message length without playing anything. 
+  + Removed playback of recorded message before saving.
+  + When in Pitch change routine, allow breaking back to command mode with key press. Changes are saved.
+  + When in Farnsworth spacing change routine, allow breaking back to command mode with key press. Changes are saved.
+  + Changed Farnsworth setting mode to play continuous DIT-DAH when not holding paddle to adjust, like Pitch command
+  + Changed Version command to return to command mode instead of normal mode if interrupted with command key
+  + Changed speed inquiry command to return to command mode instead of normal mode if interrupted with command key

@@ -34,14 +34,14 @@ To demonstrate the library, a standard keyer application has been written which 
 
 This document describes the operation of the keyer from a user perspective
 
-Version: 0.75
+Version: 0.87
 
 @section hw Hardware
 
-As is, the library is configured to run on a ATTINY45 cpu, as shipped, with its internal oscillator at 8MHz, 
+As is, the library is configured to run on a ATTINY85 cpu, as shipped, with its internal oscillator at 8MHz, 
 and prescaled to 1MHz.
 
-The ATTINY45 comes with 4KB of Flash memory and 256 Byte each for RAM and EEPROM. It can be ported to other AVR chips
+The ATTINY85 comes with 8KB of Flash memory and 512 Byte each for RAM and EEPROM. It can be ported to other AVR chips
 if these have sufficient features to support the intended application. As the library was written in C, processors without
 internal stack will not work with this application unless significantly rewritten.
 
@@ -58,8 +58,8 @@ Hardware connections are defined in yack.h
 
 @section usage Usage
 
-After reset in default mode, the keyer operates as regular IAMBIC keyer in IAMBIC A at 15 WPM
-(words per minute = 60 CPM), with 700 Hz side tone. By default, the transmitter keying signal is
+After reset in default mode, the keyer operates as regular IAMBIC keyer in IAMBIC B at 15 WPM
+(words per minute = 60 CPM), with 800 Hz side tone. By default, the transmitter keying signal is
 positive.
 
 @subsection speed Speed Change
@@ -135,7 +135,7 @@ Allows setting of an extended inter-character pause in all sending modes, which 
 Note that this of course only influences RECEPTION, not TRANSMISSION. If you desire farnsworth mode in transmission, please 
 manually pause during characters.
  
-@subsubsection lvtog I - TX level inverter toggle
+@subsubsection lvtog F (Flip) - TX level inverter toggle
 
 This function toggles wether the "active" level on the keyer output is VCC or GND. The default is VCC. This setting 
 is dependent on the attached keying circuit. An 'R' is sounded to acknowledge the request.
@@ -144,21 +144,22 @@ is dependent on the attached keying circuit. An 'R' is sounded to acknowledge th
 
 Keyer responds with current keying speed in WPM.
 
-@subsubsection msgrec 1 and 2 - Record internal messages 1 or 2
+@subsubsection msgrec 1, 2, 3, 4 - Record internal messages 1, 2, 3 or 4
 
-The keyer immediately responds with "1" or "2" after which a message up to 100 characters can be keyed at current WPM speed.
-After 5 seconds of inactivity the message is played back once and then stored in EEPROM. Choosing "1" or "2" but not keying 
-a new message deletes the chosen message buffer content.
+The keyer immediately responds with "1" or "2" or "3" or "4" after which a message up to 100 characters can be keyed at current WPM speed.
+After 5 seconds of inactivity the message is played back once and then stored in EEPROM. Choosing "1" or "2" or "3" or "4" but not keying 
+a new message deletes the chosen message buffer content. A command key press during the recording function returns the keyer to
+command mode, leaving the memory unchanged.
 
-@subsubsection msgplay E and T - Play back internal messages 1 or 2 
+@subsubsection msgplay E, I, T and M - Play back internal messages 1 or 2 or 3 or 4. 
 
-The stored messages 1 or 2 are played back with keying enabled (if configured). A press of the command key immediately
-returns the keyer to keyer mode so a QSO can be started.
+A press of the command key immediately returns the keyer to command mode so another memory may be played. A second command key press
+returns keyer to normal mode for a QSO. The stored messages 1, 2, 3, or 4 are played back with keying enabled (if configured). 
 
 @subsubsection beacon N - Automatic Beacon
 
 The keyer responds with 'N' after which a number between 0 and 9999 can be keyed. After a 5 second timeout the keyer
-responds by repeating the number and 'R'. Once the keyer returns to keyer mode, the content of message buffer 2 is
+responds by repeating the number and 'R'. Once the keyer returns to keyer mode, the content of message buffer 4 is
 repeated in intervals of n seconds. The setting is preserved in EEPROM so the chip can be used as a fox hunt keyer.
 
 Returning to command mode and entering an interval of 0 (or none at all) stops beacon mode.

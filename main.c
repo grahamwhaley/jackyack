@@ -2,7 +2,7 @@
  
  @file      main.c
  @brief     CW Keyer application
- @author    Jan Lategahn DK3LJ jan@lategahn.com (C) 2010 modified by Jack Welch AI4SV
+ @author    Jan Lategahn DK3LJ jan@lategahn.com (C) 2010 modified by Jack Welch AI4SV; modified by Don Froula WD9DMP
 
  This file implements a sample CW keyer application by using the yack.c
  library. It is targeted at the ATTINY45 microcontroller but can be used
@@ -22,12 +22,25 @@
  You should have received a copy of the GNU General Public License
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
- @version   0.75
+ @version   0.87
  
  @date      15.10.2010  - Created
  @date      16.12.2010  - Submitted to SVN
  @date      03.10.2013  - Last change
- 
+ @date      21.12.2016  - Added additional prosigns and punctuation. Added 2 additional memories for ATTINY85. Changed some commands.
+                          Fixed pitch change not saving after timeout. (WD9DMP)
+ @date      21.12.2016  - Added a call to save changes to EEPROM while in command mode loop if DIRTYFLAG set for better EEPROM parm save reliability. (WD9DMP)
+                          Changed "SK" response when leaving command mode to "#" which now decodes to proper SK without intercharacter space.
+						  Beacon command ("N") was in both the lockable and unlockable command list, making it unlockable. I removed it from the unlockable list, making it lockable.
+						  
+ @date      03.01.2017  - Added short 3 DAH delay after command returns before txok ("R") is sent to prevent some command outputs running on with txok.
+                          If memory recording is interrupted by command button, keyer now returns txok ("R") and stays in command mode. Memory is unchanged.
+						  Removed playback of recorded message before saving.
+						  When in Pitch change routine, allow breaking back to command mode with key press. Changes are saved.
+						  When in Farnsworth spacing change routine, allow breaking back to command mode with key press. Changes are saved.
+						  Changed Farnsworth setting mode to play continuous DIT-DAH when not holding paddle to adjust, like Pitch command
+						  Changed Version command to return to command mode instead of normal mode if interrupted with command key
+						  Changed speed inquiry command to return to command mode instead of normal mode if interrupted with command key
  */ 
 
 
@@ -47,8 +60,8 @@
 
 // Some texts in Flash used by the application
 const char  txok[] PROGMEM 		= "R";
-const char  vers[] PROGMEM      = "V0.75";
-const char  prgx[] PROGMEM 		= "SK";
+const char  vers[] PROGMEM      = "V0.87";
+const char  prgx[] PROGMEM 		= "#"; // # decodes to prosign SK with no intercharacter gap
 const char  imok[] PROGMEM		= "73";
 
 void pitch(void)
@@ -68,6 +81,8 @@ void pitch(void)
 		timer--;
 		yackchar('E');		// play an 'e'
 		
+		if (yackctrlkey(TRUE)) {return;}
+		
 		if(!(KEYINP & (1<<DITPIN))) // if DIT was keyed
 	  	{
 	  		yackpitch(DOWN);		// increase the pitch
@@ -81,6 +96,7 @@ void pitch(void)
 	  	}
 	  	
 	}
+	
 	
 }
 
@@ -99,21 +115,27 @@ void setfarns(void)
 	
 	while (timer++ != FARNSREPEAT) 			// while not yet timed out
 	{
+	    if (yackctrlkey(TRUE)) {return;}
+		
+	    yackplay(DIT);
+        yackdelay(IEGLEN);	// Inter Element gap  
+        yackplay(DAH);
+        yackdelay(ICGLEN);	// Inter Character gap  
+        yackfarns(); // Additional Farnsworth delay
+	
         
 		if(!(KEYINP & (1<<DITPIN))) // if DIT was keyed
 	  	{
-	  		yackspeed(DOWN,FARNSWORTH);		// increase the pitch
+	  		yackspeed(DOWN,FARNSWORTH);		// increase interword spacing
 	  		timer=0;
 	  	}
 		
 		else if(!(KEYINP & (1<<DAHPIN))) // if DAH was keyed
 	  	{
-	  		yackspeed(UP,FARNSWORTH);	// lower the pitch
+	  		yackspeed(UP,FARNSWORTH);	// decrease interword spacing
 	  		timer=0;
 	  	}
 	  
-        else 
-            yackdelay(IWGLEN);
         
 	}
 	
@@ -325,7 +347,7 @@ void beacon(byte mode)
 			{
 
 				interval = yackuser(READ, 1, 0); // Reset the interval timer
-				yackmessage(PLAY,2); // And play message 2
+				yackmessage(PLAY,4); // And play message 4
 
 				
 			} 
@@ -418,7 +440,7 @@ void commandmode(void)
                     c = TRUE;
                     break;
                         
-                case    'I': // TX level inverter toggle
+                case    'F': // TX level inverter toggle
                     yacktoggle(TXINV);
                     c = TRUE;
                     break;
@@ -434,6 +456,18 @@ void commandmode(void)
                     yackmessage(RECORD,2); 
                     c = TRUE;
                     break;
+					
+				case	'3': // Record Macro 3
+                    yackchar('3');
+                    yackmessage(RECORD,3); 
+                    c = TRUE;
+                    break;
+
+				case	'4': // Record Macro 4
+                    yackchar('4');
+                    yackmessage(RECORD,4); 
+                    c = TRUE;
+                    break;	
                     
                 case	'N': // Automatic Beacon
                     beacon(RECORD);
@@ -461,7 +495,7 @@ void commandmode(void)
             case	'U': // Tune
                 yackinhibit(OFF);
                 yacktune();
-                yackinhibit(ON);
+                yackinhibit(ON); 
                 c = TRUE;
                 break;
                 
@@ -483,18 +517,29 @@ void commandmode(void)
                 c = FALSE;
                 break;
                 
-            case	'T': // Playback Macro 2
+            case	'I': // Playback Macro 2
                 yackinhibit(OFF);
                 yackmessage(PLAY,2);
                 yackinhibit(ON);
                 timer = YACKSECS(MACTIMEOUT);
                 c = FALSE;
                 break;
-                
-            case	'N': // Automatic Beacon
-                beacon(RECORD);
-                c = TRUE;
-                break;
+				
+			case	'T': // Playback Macro 3
+                yackinhibit(OFF);
+                yackmessage(PLAY,3);
+                yackinhibit(ON);
+                timer = YACKSECS(MACTIMEOUT);
+                c = FALSE;
+                break;	
+				
+			case	'M': // Playback Macro 4
+                yackinhibit(OFF);
+                yackmessage(PLAY,4);
+                yackinhibit(ON);
+                timer = YACKSECS(MACTIMEOUT);
+                c = FALSE;
+                break;	
                 
             case    'W': // Query WPM
                 yacknumber(yackwpm());
@@ -505,10 +550,13 @@ void commandmode(void)
         }
         
         if (c == TRUE) // If c still contains a string, the command was not handled properly
+		{
+			yacksave(); //Save any non-volatile changes to EEPROM
+			yackdelay(DAHLEN * 3); //Eliminate runon txok on some commands
             yackstring(txok);
+		}
         else if (c)
-            yackerror();
-        
+            yackerror();    
             
 	}
         

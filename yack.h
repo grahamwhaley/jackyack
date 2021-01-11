@@ -1,16 +1,16 @@
 /* ********************************************************************
  Program	: yack.h
- Author		: Jan Lategahn DK3LJ modified by Jack Welch AI4SV
+ Author		: Jan Lategahn DK3LJ modified by Jack Welch AI4SV, Don Froula WD9DMP
  Purpose	: definition of keyer hardware
  Created	: 15.10.2010
- Update		: 03.10.2013
- Version	: 0.75
+ Update		: 23.12.2016
+ Version	: 0.86
  
  Changelog
  ---------
  Version		Date		Change
  ----------------------------------------------------------------------
- 
+0.86          23.12.2016    Changed sidetone back to 800 Hz and mode default to iambicB  
  
  Todo
  ----
@@ -64,7 +64,7 @@
 #define		ULTIMATIC		0b00001000  // Ultimatic Mode
 #define		DAHPRIO			0b00001100  // Always give DAH priority
 
-#define		FLAGDEFAULT		IAMBICA | TXKEY | SIDETONE
+#define		FLAGDEFAULT		IAMBICB | TXKEY | SIDETONE
 
 // Definition of volflags variable. These flags do not get stored in EEPROM.
 #define		DITLATCH		0b00000001  // Set if DIT contact was closed
@@ -81,7 +81,7 @@
 
 // YACK heartbeat frequency (in ms)
 #define		YACKBEAT		5
-#define		YACKSECS(n)		(n*(1000/YACKBEAT)) // Beats in n seconds
+#define		YACKSECS(n)		(n*(1000/YACKBEAT)) // Beats in n seconds (off by 2x for 5ms heartbeat)
 #define		YACKMS(n)		(n/YACKBEAT) // Beats in n milliseconds
 
 // Power save mode
@@ -121,7 +121,7 @@
                                                      // a given frequency
 
 // Default sidetone frequency
-#define		DEFFREQ			700     // Default sidetone frequency
+#define		DEFFREQ			800     // Default sidetone frequency
 #define		MAXFREQ			1500    // Maximum frequency
 #define		MINFREQ			400     // Minimum frequenc
 
@@ -130,7 +130,7 @@
 #define		DEFCTC			CTCVAL(DEFFREQ)
 
 // The following are various definitions in use throughout the program
-#define		RBSIZE			100     // Size of each of the two EEPROM buffers
+#define		RBSIZE			100     // Size of each of the four EEPROM buffers
 
 #define		MAGPAT			0xA5    // If this number is found in EEPROM, content assumed valid
 

@@ -27,8 +27,10 @@
 #----------------------------------------------------------------------------
 
 
-MCU=attiny45
-ADMCU=t45
+#MCU=attiny45
+MCU=attiny85
+#ADMCU=t45
+ADMCU=t85
 
 
 # Processor frequency.

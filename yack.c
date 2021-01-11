@@ -2,9 +2,9 @@
  
  @file      yack.c
  @brief     CW Keyer library
- @author    Jan Lategahn DK3LJ jan@lategahn.com (C) 2011; modified by Jack Welch AI4SV
+ @author    Jan Lategahn DK3LJ jan@lategahn.com (C) 2011; modified by Jack Welch AI4SV; modified by Don Froula WD9DMP
  
- @version   0.75
+ @version   0.87
  
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,11 @@
  
  @date      15.10.2010  - Created
  @date      03.10.2013  - Last update
+ @date      21.12.2016  - Added additional prosigns and punctuation. Added 2 additional memories for ATTINY85. Fixed save of speed change to EEPROM. (WD9DMP)
+ @date      03.01.2017  - If memory recording is interrupted by command button, keyer now returns txok ("R") and stays in command mode. Memory is unchanged.
+                          Memory playback halts immediately on command key instead of looping through message length without playing anything.
+						  Removed playback of recorded message before saving.
+						  Changed yackstring command to return to command mode instead of normal mode if interrupted with command key
  
  @todo      Make the delay dependent on T/C 1 
 
@@ -61,15 +66,19 @@ static      byte    farnsworth;     // Additional Farnsworth pause
 // EEPROM Data
 
 byte		magic EEMEM = MAGPAT;	// Needs to contain 'A5' if mem is valid
-byte		flagstor EEMEM = ( IAMBICA | TXKEY | SIDETONE);	//	Defaults	
-word		ctcstor EEMEM = DEFCTC;	// Pitch = 700Hz
+byte		flagstor EEMEM = ( IAMBICB | TXKEY | SIDETONE);	//	Defaults	
+word		ctcstor EEMEM = DEFCTC;	// Pitch = 800Hz
 byte		wpmstor EEMEM = DEFWPM;	// 15 WPM
 byte        fwstor  EEMEM = 0; // No farnsworth pause
 word		user1 EEMEM = 0; // User storage
 word		user2 EEMEM = 0; // User storage
 
-char		eebuffer1[100] EEMEM = "message 1";
-char		eebuffer2[100] EEMEM = "message 2";
+//char		eebuffer1[100] EEMEM = "message 1";
+//char		eebuffer2[100] EEMEM = "message 2";
+char		eebuffer1[100] EEMEM = "message 1"; 
+char		eebuffer2[100] EEMEM = "message 2"; 
+char		eebuffer3[100] EEMEM = "message 3";
+char		eebuffer4[100] EEMEM = "message 4"; 
 
 // Flash data
 
@@ -125,12 +134,29 @@ const byte morse[] PROGMEM =
 	0b10111000, // Y
 	0b11001000, // Z
 	0b00110010, // ?
-	0b10001100, // =
 	0b01010110, // .
+	0b10010100, // /
+	0b11101000, // ! (American Morse version, commonly used in ham circles)
+	0b11001110, // ,
+	0b11100010, // :
+	0b10101010, // ;
+	0b01001010, // "
+	0b00010011, // $
+	0b01111010, // ' (Apostrophe)
+	0b10110100, // ( or [ (also prosign KN)
+    0b10110110, // ) or ]
+	0b10000110, // - (Hyphen or single dash)
+	0b01101010, // @
+	0b00110110, // _ (Underline)
+	0b01010010, // Paragaraph break symbol
+	0b10001100, // = and BT
 	0b00010110, // SK
-	0b01010100, // AR
-	0b10010100  // /
-	
+	0b01010100, // + and AR
+	0b10001011, // BK
+	0b01000100, // AS
+	0b10101100, // KA (also ! in alternate Continental Morse)
+	0b00010100, // VE
+	0b01011000  // AA
 };
 
 
@@ -140,7 +166,7 @@ const byte morse[] PROGMEM =
 // To add new characters, add them in the code table above at the end and below
 // Do not forget to increase the legth of the array..
 
-const char spechar[6] PROGMEM = "?=.#$/";
+const char spechar[24] PROGMEM = "?./!,:;~$^()-@_|=#+*%&<>";
 
 
 
@@ -160,7 +186,7 @@ void yackreset (void)
 */
 {
 
-	ctcvalue=DEFCTC; // Initialize to 700 Hz
+	ctcvalue=DEFCTC; // Initialize to 800 Hz
     wpm=DEFWPM; // Init to default speed
 	wpmcnt=(1200/YACKBEAT)/DEFWPM; // default speed
     farnsworth=0; // No Farnsworth gap
@@ -828,7 +854,7 @@ void yackstring(const char *p)
 	
 	char c;
 	
-	while ((c = pgm_read_byte(p++))&& !(yackctrlkey(FALSE)) )
+	while ((c = pgm_read_byte(p++))&& !(yackctrlkey(TRUE)) )
 		// While end of string in flash not reached and ctrl not pressed
 		yackchar(c);            // Play the read character
 								// abort now if someone presses command key
@@ -852,7 +878,7 @@ void yacknumber(word n)
     char buffer[5];
     byte i = 0;
 	
-	while (n) // Until nothing left
+	while (n) // Until nothing left or control key pressed
 	{
 		buffer[i++] = n%10+'0'; // Store rest of division by 10
 		n /= 10;                // Divide by 10
@@ -860,6 +886,7 @@ void yacknumber(word n)
 	
     while (i)
     {
+		if (yackctrlkey(TRUE)) {break;}
         yackchar(buffer[--i]);
     }
     
@@ -956,7 +983,9 @@ byte yackctrlkey(byte mode)
 			
 		}
         
-		_delay_ms(50); // Trailing edge debounce	
+		_delay_ms(50); // Trailing edge debounce
+		
+        yacksave();	// In case we had a speed change	
 		
 	}
 
@@ -967,7 +996,7 @@ byte yackctrlkey(byte mode)
         volflags &= ~(CKLATCH);
     }
     
-    yacksave(); // In case we had a speed change
+    //yacksave(); // In case we had a speed change (Does NOT work if command is here - moved immediately after button release debounce)
     
 	return((volbfr&CKLATCH)!=0); // Tell caller if we had a ctrl button press
 	
@@ -1023,7 +1052,7 @@ void yackmessage(byte function, byte msgnr)
  key.
  
  @param     function    RECORD or PLAY
- @param     msgnr       1 or 2
+ @param     msgnr       1 or 2 or 3 or 4
  @return    TRUE if all OK, FALSE if lock prevented message recording
  
  */
@@ -1042,7 +1071,7 @@ void yackmessage(byte function, byte msgnr)
 		extimer = YACKSECS(DEFTIMEOUT);	// 5 Second until message end
 	   	while(extimer--)	// Continue until we waited 10 seconds
    		{
-			if (yackctrlkey(FALSE)) return;
+			if (yackctrlkey(TRUE)) return;
 			
 			if ((c = yackiambic(ON))) // Check for a character from the key
 			{
@@ -1066,14 +1095,20 @@ void yackmessage(byte function, byte msgnr)
 			rambuffer[--i] = 0; // Add a \0 end marker over last space
 			
 			// Replay the message
-			for (n=0;n<i;n++)
-				yackchar(rambuffer[n]);
+			//for (n=0;n<i;n++){
+			//	if (yackctrlkey(TRUE)) {return;} //Break to command mode without saving if command key pressed
+			//	yackchar(rambuffer[n]);
+	        //    }
 			
 			// Store it in EEPROM
 			if (msgnr == 1)
 	  			eeprom_write_block(rambuffer,eebuffer1,RBSIZE);
-			else
-  	  			eeprom_write_block(rambuffer,eebuffer2,RBSIZE);
+			if (msgnr == 2)
+	  			eeprom_write_block(rambuffer,eebuffer2,RBSIZE);
+			if (msgnr == 3)
+	  			eeprom_write_block(rambuffer,eebuffer3,RBSIZE);
+			if (msgnr == 4)
+	  			eeprom_write_block(rambuffer,eebuffer4,RBSIZE);
 		}
 		else
 			yackerror();
@@ -1085,12 +1120,18 @@ void yackmessage(byte function, byte msgnr)
 		// Retrieve the message from EEPROM
 		if (msgnr == 1)
 	  		eeprom_read_block(rambuffer,eebuffer1,RBSIZE);
-		else
-  	  		eeprom_read_block(rambuffer,eebuffer2,RBSIZE);
+		if (msgnr == 2)
+	  		eeprom_read_block(rambuffer,eebuffer2,RBSIZE);
+		if (msgnr == 3)
+	  		eeprom_read_block(rambuffer,eebuffer3,RBSIZE);
+		if (msgnr == 4)
+	  		eeprom_read_block(rambuffer,eebuffer4,RBSIZE);
 		
 		// Replay the message
-		for (n=0;(c=rambuffer[n]);n++) // Read until end of message
+		for (n=0;(c=rambuffer[n]);n++){ // Read until end of message
+		if (yackctrlkey(FALSE)) {return;} //Break immediately if command key pressed
 			yackchar(c); // play it back 
+		}
 		
 	}
 	
